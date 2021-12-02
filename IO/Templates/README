@@ -1,0 +1,35 @@
+
+##################################################################################################
+
+###### META FILES ######
+### Naming convention: .*cfmeta$ (so .cfmeta is also valid)
+### Other conventions:
+# - a meta file should exist in the top level dir. Files/Folders not covered by the meta file are ignored
+# - there can be meta files in subdirs too  (in which case parent paths are added to paths when importing, and removed when exporting. for key lookups)
+# - there can be more than one meta file at any level (for composing)
+### Content: perl hash with the following layout (all optional):
+### Notice that the whole meta file suit is about syntax. it mostly does not care about this by itself.
+#{
+#   _default_meta => {
+#    '$key',         # $key is CHMOD. UID, GID (reduces verbosity and keeps simple folders easier to maintain)
+#                    # also LOCATION (and really anything) can be set, which will just be added to files (and folders).
+#                    # be aware that this can be made useful, but will most likely make you wonder where your kneecaps went.
+#                    # each default key must only exist once on a level.
+#                    # default keys are scoped to its level and below. these defaults override the defaults stated below
+#   }
+#   './path/file' => { # path/ can be optional. file is optional if path/ (trailing /) is given, for dir permissions
+#                      # paths must be relative to the meta file location and start with ./ to indicate that
+#		               # file could be *, to indicate all files/dirs in a given dir (but not below).
+#                      # file could be **, to indicate all files/dirs (recursively)
+#                      # _default_meta is applied recursively
+#                      # in which case order is as usual. file->*(*)->default->parent_default
+#	    LOCATION,	 # default: key removed
+#	    CHMOD,		 # default: mode read from FS
+#	    UID,		 # default: key removed
+#	    GID,		 # default: key removed
+#       SYMLINK,     # default:
+#       BASE64 .     # default:
+#   },
+#}
+
+1;

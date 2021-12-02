@@ -1,0 +1,13 @@
+
+This set of modules focuses around tree operations
+
+Tree::Iterators is the base upon which the rest is build. it serves 2 iterators, one for iterating multiple arrays, and one for traversing a single tree
+Tree::Slice uses Tree::Iterators to return wanted chunks of a tree
+Tree::Build is the reversal of Tree::Slice, it takes a set of Tree::Slice chunks and builds a tree
+            right now it also provides a function designed for specific plugin needs, which should be removed in future versions
+Tree::Search provides more refined functions to search data in a tree, based on Tree::Slice and Tree::Iterators, used by higher level code
+Tree::Merge is a replacement of Hash::Merge, which I canned because it had some quirks, could not handle CODE references and implementing it on top of Tree::* was easy
+	    it does what it says.
+
+	    
+
