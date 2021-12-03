@@ -34,19 +34,18 @@ sub slice_tree ( $tree, $iterator_condition, @args ) {
     my $depth           = shift @args;
 
     confess 'ERROR: no condition given' if ( ref $iterator_condition ne 'CODE' );
-    $branch_to_queue = \&_tree_branch_to_queue unless $branch_to_queue; # default to _tree_branch_to_queue unless an alternative is given
+    $branch_to_queue = \&_tree_branch_to_queue unless $branch_to_queue;    # default to _tree_branch_to_queue unless an alternative is given
     confess 'ERROR: supplied $branch_to_queue is not a code ref' unless ( ref $branch_to_queue eq 'CODE' );
 
-    my $it   = tree_iterator( $tree, $branch_to_queue, $iterator_condition ); # set up iterator
+    my $it   = tree_iterator( $tree, $branch_to_queue, $iterator_condition );    # set up iterator
     my @hits = ();
 
-    # only use elements that match our search length
-    while ( defined( my $hit = $it->() ) ) {
+    while ( defined( my $hit = $it->() ) ) {                                     # only use elements that match our search length
 
-        last if $depth && $depth < scalar $hit->[1]->@*; # break once we reach the maximum depth of interest, if given
+        last if $depth && $depth < scalar $hit->[1]->@*;                         # break once we reach the maximum depth of interest, if given
 
         #say "walk__: $hit->[0], $hit->[1]->@*, $keys->@*";
-        push @hits, $hit;
+        push @hits, $hit if $hit->[1]->@*;                                       # don't return hits the iterator condition reduced to nothing
     }
     return @hits;
 }

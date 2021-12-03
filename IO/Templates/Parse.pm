@@ -75,7 +75,6 @@ sub _check_template ( $template, $substitutions ) {
             $toomuch->{$joined_keys} = '';
         }
     }
-
     return ( $missing, $toomuch ) if ( scalar keys $missing->%* != 0 || scalar keys $toomuch->%* != 0 );
     return;
 }
@@ -96,6 +95,10 @@ sub _get_ref ( $pointer, @keys ) {
 ### conditionals get resolved at the cfgen stage...
 ###
 ##############################################
+my @allowed_tt_vmethods = (
+    'match',
+    'ttvalue'    # this is a TT variable name than can be used inside templates to store values for scripting tt
+);
 
 sub get_variable_tree($array) {
 
@@ -115,6 +118,9 @@ sub get_variable_tree($array) {
             }
 
             if ( scalar keys $branch->[0]->%* == 0 ) {
+                for my $ttv (@allowed_tt_vmethods) {    # remove special tt vmethods and variables
+                    pop $branch->[1]->@* if ( $branch->[1]->[-1] eq $ttv );
+                }
                 $branch->[0] = join( ' ', $branch->[1]->@* );
                 return 1;
             }
@@ -139,8 +145,8 @@ sub check_and_fill_template ( $template, $substitutions ) {
 sub check_and_dontdietryingto_fill_template ( $template, $substitutions ) {
 
     my ( $missing, $toomuch ) = _check_template( $template, $substitutions );
-    return _fill_template( $template, $substitutions ), $missing, $toomuch if ( scalar keys $missing->%* == 0 && scalar keys $toomuch->%* == 0 );
-    return [], $missing, $toomuch;
+    return [], $missing, $toomuch if ( scalar keys $missing->%* != 0 || scalar keys $toomuch->%* != 0 );
+    return _fill_template( $template, $substitutions ), $missing, $toomuch;
 }
 
 # can handle a whole tree

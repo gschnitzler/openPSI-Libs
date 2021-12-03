@@ -129,13 +129,12 @@ sub _error($errors) {
     foreach my $variable_name ( sort keys $errors->%* ) {
         print_table( 'Too short/Missing variable', '', ": $variable_name\n" );
     }
-
     return $error;
 }
 
 sub _get_templates($data) {
 
-    # get all templates (this also matches SECRETS, but they are not supposed to container TT variabes)
+    # get all templates (this also matches SECRETS, but they are not supposed to contain TT variables)
     # dont match binaries
     my $cond = sub ($branch) {
         return 1 if ref $branch->[0] eq 'HASH' && exists $branch->[0]->{CONTENT} && ( !exists $branch->[0]->{BASE64} || !$branch->[0]->{BASE64} );
@@ -148,6 +147,7 @@ sub _get_templates($data) {
 # do not allow templates to sport empty variables.
 # if you ever want to add optional template variables, find other means
 # disabling this check is not what you want
+# also, when you find this function to be a good candidate for modifications.: stop. you got it wrong. look at your data
 sub _check_empty_leaves($tree) {
 
     # check for empty leaves
