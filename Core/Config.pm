@@ -12,7 +12,7 @@ sub core_config () {
     return {
         DEBUG      => 0,
         MACROSAVE  => '/tmp/macrosave',
-        MACROMOUNT => '/mnt',
+        MACROMOUNT => '/mnt/genesis',
     };
 }
 

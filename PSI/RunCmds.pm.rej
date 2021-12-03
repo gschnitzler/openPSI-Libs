@@ -1,0 +1,11 @@
+--- Libs/PSI/RunCmds.pm
++++ Libs/PSI/RunCmds.pm
+@@ -16,7 +16,7 @@ sub _rescueshell ( $p ) {
+     say ">>>>>>>>>>>>>>>>>>>>> RESCUE SHELL: 'exit 0' when successfull, otherwise 'exit 1'\n";
+ 
+     # the rescueshell file is used for Build::Cmds::Build
+-    # while genesis is required to be run as root, other programs might.
++    # while genesis is required to be run as root, other programs might not.
+     # yet, this Module is used by Core::Cmds::System.
+     # non-root users cant write to /, but /tmp might not yet exist when buildmanager throws an error
+     # This filepath should not be hardcoded
