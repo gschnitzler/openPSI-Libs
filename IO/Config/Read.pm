@@ -77,7 +77,6 @@ sub load_config ($pkg_def) {
         # perl style hashes in a perl app, where you trust the data (because you wrote it yourself) seemed the saner choice.
         # alternatives would be to parse YAML or JSON and validate it.
         # a lot of abstraction for the same result.
-        # plus, then you could not use perl::tidy
         # also the JSON and YAML are mere deratives of perl structures, but look like shit
         my $mod_c  = join( "\n", $module->{CONTENT}->@* );
         my $pkg_cf = eval $mod_c or confess "ERROR: syntax error in $module->{FILE}";    ## no critic (BuiltinFunctions::ProhibitStringyEval)

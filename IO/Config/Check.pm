@@ -8,7 +8,7 @@ use Carp;
 use PSI::Console qw(print_table);
 use Tree::Slice qw(slice_tree);
 
-our @EXPORT_OK = qw(check_config dir_exists file_exists socket_exists);
+our @EXPORT_OK = qw(check_config dir_exists file_exists socket_exists link_exists);
 
 my $helper = {
     dircheck       => \&_dircheck,
@@ -130,6 +130,16 @@ sub socket_exists ($fp) {
     local ( $?, $! );
     return 0 unless $fp;
     return 1 if ( -e $fp and -S $fp and -r $fp );
+    return 0;
+}
+
+sub link_exists ($fp) {
+
+    local ( $?, $! );
+    return 0 unless $fp;
+    if ( -e $fp and -l $fp and -r $fp ){
+        return readlink $fp;
+    }
     return 0;
 }
 
