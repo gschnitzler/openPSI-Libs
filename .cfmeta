@@ -1,5 +1,6 @@
 {
     './**'        => {},
+    './.git/**'   => { IGNORE => '1' },
     _default_meta => {
         CHMOD => '500'
     }

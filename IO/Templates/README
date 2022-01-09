@@ -27,6 +27,7 @@
 #	    CHMOD,		 # default: mode read from FS
 #	    UID,		 # default: key removed
 #	    GID,		 # default: key removed
+#     IGNORE,   # delete from tree
 #       SYMLINK,     # default:
 #       BASE64 .     # default:
 #   },

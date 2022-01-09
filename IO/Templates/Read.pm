@@ -58,6 +58,9 @@ sub _read_templates_from_meta ( $doread, $path, $meta ) {
         BASE64 => sub ( $r, $v ) {
             $r->{BASE64} = $v;
         },
+        IGNORE => sub ( $r, $v ) { # added just for completeness
+            $r->{IGNORE} = $v;
+        },
         CONTENT => sub (@) {
             die 'ERROR: illegal keyword CONTENT';
         }
@@ -72,7 +75,8 @@ sub _read_templates_from_meta ( $doread, $path, $meta ) {
 
         my $relative_path_to_file = join( '/', '.', $e->[1]->@* );
         my $flags                 = $e->[0]->{'.'};
-        my $f                     = _create_file_structure( $doread, $path, $relative_path_to_file );
+        next if exists $flags->{IGNORE};
+        my $f = _create_file_structure( $doread, $path, $relative_path_to_file );
 
         for my $entry ( keys $flags->%* ) {
 
@@ -105,7 +109,7 @@ sub _read_templates_from_meta ( $doread, $path, $meta ) {
     # now add dir info. stick to '..'
     # all direct and indirect users of templates must be aware of the syntax.
     my $dir_cond = sub ($b) {
-        return 1 if ( ref $b->[0] eq 'HASH' && exists $b->[0]->{'..'} );
+        return 1 if ( ref $b->[0] eq 'HASH' && exists $b->[0]->{'..'} && !exists $b->[0]->{'..'}->{IGNORE} );
         return 0;
     };
 
