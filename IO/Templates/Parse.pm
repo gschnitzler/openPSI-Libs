@@ -95,10 +95,10 @@ sub _get_ref ( $pointer, @keys ) {
 ### conditionals get resolved at the cfgen stage...
 ###
 ##############################################
-my @allowed_tt_vmethods = (
-    'match',
-    'ttvalue'    # this is a TT variable name than can be used inside templates to store values for scripting tt
-);
+my $allowed_tt_vmethods = {
+    match   => sub($b) { pop $b->[1]->@*; },
+    ttvalue => sub($b) { pop $b->[1]->@*; }    # this is a TT variable name than can be used inside templates to store values for scripting tt
+};
 
 sub get_variable_tree($array) {
 
@@ -118,8 +118,8 @@ sub get_variable_tree($array) {
             }
 
             if ( scalar keys $branch->[0]->%* == 0 ) {
-                for my $ttv (@allowed_tt_vmethods) {    # remove special tt vmethods and variables
-                    pop $branch->[1]->@* if ( $branch->[1]->[-1] eq $ttv );
+                for my $ttv ( keys $allowed_tt_vmethods->%* ) {    # remove special tt vmethods and variables
+                    $allowed_tt_vmethods->{$ttv}->($branch) if ( $branch->[1]->[-1] eq $ttv );
                 }
                 $branch->[0] = join( ' ', $branch->[1]->@* );
                 return 1;

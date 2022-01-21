@@ -59,7 +59,7 @@ sub run_system ( @cmds ) {
     foreach my $cmd (@cmds) {
 
         local ( $!, $? );                                              # don't let anything escape
-        system join( "\n", $cmd ) or print '';                         # the newline is added in case a $cmd has multiple lines but no trailing newline,
+        system join( "\n", "set -uo pipefail; $cmd" ) or print '';     # the newline is added in case a $cmd has multiple lines but no trailing newline,
                                                                        # rendering the shell unable to parse the last statement. like EOF.
         next unless $?;
 
@@ -93,19 +93,19 @@ sub run_open ( $cmd, @args ) {
     my $stop_reading  = 0;
     confess "ERROR: It's a trap! EC:$? MSG:'$!'" if ( $! or $? );
 
-    return unless ( open( my $fh, '-|', $cmd ) or $open_handler->( $cmd, $!, $? >> 8) );    # don't return true in the open_handler on error,
-                                                                                        # otherwise execution will continue
+    return unless ( open( my $fh, '-|', $cmd ) or $open_handler->( $cmd, $!, $? >> 8 ) );    # don't return true in the open_handler on error,
+                                                                                             # otherwise execution will continue
     while ( my $line = <$fh> ) {
-        push @output, $read_handler->( \$stop_reading, $line );                         # handler should return whatever is desired in @output.
-                                                                                        # in cases where you want to stop reading streams, like tail -f,
-                                                                                        # a callback can be set via ${$stop}++ in the handler
+        push @output, $read_handler->( \$stop_reading, $line );                              # handler should return whatever is desired in @output.
+                                                                                             # in cases where you want to stop reading streams, like tail -f,
+                                                                                             # a callback can be set via ${$stop}++ in the handler
         if ($stop_reading) {
             close $fh or print '';    # when you stop reading from a stream, you don't care about the exit code
             return @output;           # and close will return false in any case, so lets skip that
         }
     }
 
-    close $fh or $close_handler->( $cmd, $!, $? >> 8);    # no 'return unless' used as it makes no sense to not return @output
+    close $fh or $close_handler->( $cmd, $!, $? >> 8 );    # no 'return unless' used as it makes no sense to not return @output
     return @output;
 }
 
