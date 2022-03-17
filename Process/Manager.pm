@@ -25,7 +25,7 @@ Forks::Super->deinit_pkg;
 
 ##########################################################
 
-sub _convert_tree($worker_tree) {
+sub _convert_tree ($worker_tree) {
 
     my @q = ();
     foreach my $name ( keys( $worker_tree->%* ) ) {
@@ -50,13 +50,15 @@ sub _init_workers ( $debug, $max_slots, $used_slots, $workers ) {
         my $w      = $e->[1];
         my $worker = {
             QUEUE  => $w->{QUEUE},
-            BUFFER => [],
+            BUFFER => {},
+            FLUSH  => {},
             PID    => fork {
-                max_proc => 0,                           # 0 gives uninitialized value, use -1, fixed in 0.93
+                max_proc => 0,                     # 0 gives uninitialized value, use -1, fixed in 0.93
                 name     => $name,
                 sub      => $w->{TASK},
                 args     => $w->{DATA},
-                child_fh => 'in,out,err,socket,:utf8',
+                child_fh => 'in,out,err,:utf8',    # sockets impose a buffer limit. which is bad. pipes are even worse. so stick to temp files.
+                                                   # took me 2 days to track this down. jobs would hang with unread buffers when you write to much to stdout
             },
         };
 
@@ -66,7 +68,7 @@ sub _init_workers ( $debug, $max_slots, $used_slots, $workers ) {
         # as we already have a loop for the messaging, we will use that.
         $worker->{TIMEOUT} = time + $w->{TIMEOUT} if ( exists( $w->{TIMEOUT} ) );
 
-        die 'ERROR: could not fork.' if ( !$worker->{PID} );
+        die 'ERROR: could not fork.'                             if ( !$worker->{PID} );
         print_table( $name, "(PID: $worker->{PID}))", ": OK\n" ) if ($debug);
         push @initialized, $worker;
         ${$used_slots}++;
@@ -74,41 +76,51 @@ sub _init_workers ( $debug, $max_slots, $used_slots, $workers ) {
     return @initialized;
 }
 
-sub _relay_msgs ( $debug, $self, $others ) {
+sub _print_parent_msg ( $msg, $debug ) {
+    say 'from: ', $msg->{from}, ' msg: ', $msg->{msg} if $debug;
+    say $msg->{msg};
+    return;
+}
 
-    my @lines = ( $self->{PID}->read_stderr(), $self->{PID}->read_stdout() );
+sub _relay_msgs ( $debug, $self, $others, $msg_handler ) {
+
+    my @lines = (
+        [ 'err', [ $self->{PID}->read_stderr() ] ],    #
+        [ 'out', [ $self->{PID}->read_stdout() ] ]     #
+    );
 
     # read_stderr and read_sdtout feature standard diagnostics of nothing could be read.
     # thats ok. to make debugging easier:
     $? = $! = 0;    ## no critic
 
     foreach my $msg ( relay_msgs( $self, $others, @lines ) ) {
-
-        # these are for the parent
-        say 'from: ', $msg->{from}, ' msg: ', $msg->{msg} if $debug;
-        say $msg->{msg};
+        ref $msg_handler eq 'CODE' ? $msg_handler->( $msg, $debug ) : _print_parent_msg( $msg, $debug );    # these are for the parent
     }
     return;
 }
 
-sub _cleanup_worker($worker) {    # empty buffer
+sub _cleanup_worker ($worker) {    # empty buffer
 
-    my $remaining_buffer = join( '', $worker->{BUFFER}->@* );
-
-    say "WARNING: process $worker->{PID}->{name} had an unread buffer on exit: $remaining_buffer" if ($remaining_buffer);
+    if ( scalar keys $worker->{BUFFER}->%* || scalar keys $worker->{FLUSH}->%* ) {
+        say "WARNING: process $worker->{PID}->{name} had an unread buffer on exit:";
+        say "BUFFER:", Dumper $worker->{BUFFER};
+        say "FLUSH: ", Dumper $worker->{FLUSH};
+    }
     say "WARNING: process $worker->{PID}->{name} exit code was: $worker->{PID}->{status}" if ( $worker->{PID}->{status} );
 
     $worker->{PID}->wait();
     $worker->{PID}->dispose();
 
     # dispose emits 'No such file or directory'.thats ok.
-    $? = $! = 0;                  ## no critic
+    $? = $! = 0;    ## no critic
 
     delete $worker->{PID};
     return;
 }
 
-sub task_manager ( $debug, $workers, $max_slots ) {
+sub task_manager ( $debug, $workers, $max_slots, @args ) {
+
+    my $msg_handler = shift @args;
 
     # this single line took me way over 20h to figure out.
     # so Forks::Super sets $SIG{CHLD}=sub{} if(!defined($SIG{CHLD}))
@@ -152,7 +164,7 @@ sub task_manager ( $debug, $workers, $max_slots ) {
     # not the most elegant, but easy to implement.
     while (1) {
 
-        last if ( $#running < 0 );
+        last          if ( $#running < 0 );
         say '=CYCLE=' if $debug;
         sleep $SLEEP_INTERVAL;
         my $time = time;
@@ -163,7 +175,7 @@ sub task_manager ( $debug, $workers, $max_slots ) {
 
         foreach my $worker (@running) {
 
-            _relay_msgs( $debug, $worker, [ @running, @cur_running ] );
+            _relay_msgs( $debug, $worker, [ @running, @cur_running ], $msg_handler );
 
             if ( $worker->{PID}->is_complete ) {
 

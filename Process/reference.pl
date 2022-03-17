@@ -15,7 +15,7 @@ use Process::Manager qw(task_manager);
 my $debug   = 1;
 my $workers = {
     A => {
-        TASK => sub($data) {
+        TASK => sub ($data) {
 
             my $task_name = 'A';
             my ( $k, $v ) = ( $data->%* );
@@ -23,12 +23,14 @@ my $workers = {
             say "$task_name started";
             sleep 1;
             put_msg(
-                {   to  => 'B',
+                {
+                    to  => 'B',
                     msg => "$task_name says hi to B, btw my data key is $k and the value $v"
                 }
             );
             put_msg(
-                {   to  => 'parent',
+                {
+                    to  => 'parent',
                     msg => "$task_name puts_msg to parent"
                 }
             );
@@ -47,12 +49,14 @@ my $workers = {
                     say "$task_name started";
                     sleep 1;
                     put_msg(
-                        {   to  => 'B',
+                        {
+                            to  => 'B',
                             msg => "$task_name says hi to B, btw my data key is $k and the value $v"
                         }
                     );
                     put_msg(
-                        {   to  => 'parent',
+                        {
+                            to  => 'parent',
                             msg => "$task_name puts_msg to parent"
                         }
                     );
@@ -66,7 +70,7 @@ my $workers = {
                 DATA => { TO => '3' },
             },
             AC => {
-                TASK => sub($data ) {
+                TASK => sub ($data) {
 
                     my $task_name = 'AC';
                     my ( $k, $v ) = ( $data->%* );
@@ -75,12 +79,14 @@ my $workers = {
                     sleep 1;
                     put_msg(
 
-                        {   to  => 'B',
+                        {
+                            to  => 'B',
                             msg => "$task_name says hi to B, btw my data key is $k and the value $v"
                         }
                     );
                     put_msg(
-                        {   to  => 'parent',
+                        {
+                            to  => 'parent',
                             msg => "$task_name puts_msg to parent"
                         }
                     );
@@ -105,7 +111,8 @@ my $workers = {
 
                         sleep 0.5;
                         put_msg(
-                            {   to  => 'B',
+                            {
+                                to  => 'B',
                                 msg => "i tell you $i"
                             }
                         );
@@ -114,7 +121,8 @@ my $workers = {
                     }
                     say "$task_name THATS IT I QUIT";
                     put_msg(
-                        {   to  => 'B',
+                        {
+                            to  => 'B',
                             msg => "THATS IT I QUIT"
                         }
                     );
@@ -127,14 +135,15 @@ my $workers = {
     },
 
     B => {
-        TASK => sub($data) {
+        TASK => sub ($data) {
             my $task_name = 'B';
             my ( $k, $v ) = ( $data->%* );
 
             say "$task_name started";
 
             put_msg(
-                {   to  => 'parent',
+                {
+                    to  => 'parent',
                     msg => "$task_name puts_msg to parent"
                 }
             );
@@ -146,7 +155,8 @@ my $workers = {
                 my @msgs = get_msg(<STDIN>);
                 foreach my $msg (@msgs) {
                     put_msg(
-                        {   to  => 'parent',
+                        {
+                            to  => 'parent',
                             msg => "B received: $msg->{msg}"
                         }
                     );
@@ -163,7 +173,7 @@ my $workers = {
         DATA => {},
     },
     T => {
-        TASK => sub($data) {
+        TASK => sub ($data) {
             my $task_name = 'T';
             my ( $k, $v ) = ( $data->%* );
 
@@ -175,9 +185,9 @@ my $workers = {
         },
         DATA    => {},
         TIMEOUT => 5,
-        }
+    }
 
 };
 
-task_manager( $debug, $workers, 20);
+task_manager( $debug, $workers, 20 );
 

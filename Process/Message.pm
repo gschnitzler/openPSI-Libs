@@ -13,7 +13,7 @@ our @EXPORT_OK = qw(put_msg get_msg relay_msgs);
 #
 #############################################################
 
-sub _encode_msg($msg) {
+sub _encode_msg ($msg) {
 
     if ( !defined( $msg->{to} ) || !defined( $msg->{msg} ) ) {
         say 'ERROR: invalid msg', Dumper $msg;
@@ -24,7 +24,7 @@ sub _encode_msg($msg) {
     return join( '', "\0", $msg->{from}, "\0", $msg->{to}, "\0", $msg->{msg} );
 }
 
-sub _decode_msg($line) {
+sub _decode_msg ($line) {
 
     $line =~ s/^\0//;
     my @part = split( /\0/, $line );
@@ -54,23 +54,27 @@ sub _get_unfiltered_msg ( $from, $line ) {
     return $msg;
 }
 
-sub _buffer_line ( $buffer, $line ) {
+sub _add_to_buffer ( $buffer, $flush, $from, $stream ) {
+    my $stream_name = $stream->[0];
 
-    if ( $line =~ /\n$/s ) {
-        $line = join( '', $buffer->@*, $line );
-        $buffer->@* = ();    ## no critic
+    while ( my $line = shift $stream->[1]->@* ) {
+
+        my $msg = _get_unfiltered_msg $from, $line;
+        my $to  = $msg->{to};
+        $buffer->{$stream_name}->{$to} = () unless ref $buffer->{$stream_name}->{$to} eq 'ARRAY';
+        push $buffer->{$stream_name}->{$to}->@*, $msg->{msg};
+        next unless $line =~ /\n$/;
+        $flush->{$stream_name}->{$to} = join '', $buffer->{$stream_name}->{$to}->@*;
+        delete $buffer->{$stream_name}->{$to};
+        delete $buffer->{$stream_name} unless scalar keys $buffer->{$stream_name}->%*;
     }
-    else {
-        push $buffer->@*, $line;
-        $line = '';
-    }
-    return $line;
+    return;
 }
 
 ###############################################
 
 #used by clients only. pad the from part. clients dont supply it
-sub put_msg($msg) {
+sub put_msg ($msg) {
 
     $msg->{from} = '_';
     say _encode_msg($msg);
@@ -90,35 +94,40 @@ sub get_msg (@lines) {
     return wantarray ? @messages : $messages[0];    # when the caller only supplies on argument, it expects SCALAR context
 }
 
-sub relay_msgs ( $self, $others, @lines ) {
+sub relay_msgs ( $self, $others, @streams ) {
 
     my @parent = ();
     my $from   = $self->{PID}->{name};
+    my $flush  = $self->{FLUSH};
 
-    while ( my $line = shift @lines ) {
+    for my $stream (@streams) {
+        _add_to_buffer $self->{BUFFER}, $flush, $from, $stream;
+    }
 
-        # lines are supposed to end with a newline.
-        # buffer lines that were to eagerly read, complete them once they are finished
-        $line = _buffer_line( $self->{BUFFER}, $line );
-        next unless ($line);
+    for my $stream_name ( keys $flush->%* ) {
+        for my $to ( keys $flush->{$stream_name}->%* ) {
+            my $msg = {
+                from => $from,
+                to   => $to,
+                msg  => delete $flush->{$stream_name}->{$to}
+            };
 
-        my $msg = _get_unfiltered_msg( $from, $line );
-
-        if ( $msg->{to} eq 'parent' ) {
-            push @parent, $msg;
-            next;
-        }
-
-        my $sent = 0;
-        foreach my $worker ( $others->@* ) {
-
-            last if ($sent);
-            if ( exists( $worker->{PID}->{name} ) && $worker->{PID}->{name} eq $msg->{to} ) {
-                $worker->{PID}->write_stdin( _encode_msg($msg), "\n" );
-                $sent++;
+            if ( $to eq 'parent' ) {
+                push @parent, $msg;
+                next;
             }
+
+            my $sent = 0;
+            for my $worker ( $others->@* ) {
+                last if ($sent);
+                if ( exists( $worker->{PID}->{name} ) && $worker->{PID}->{name} eq $msg->{to} ) {
+                    $worker->{PID}->write_stdin( _encode_msg($msg), "\n" );
+                    $sent++;
+                }
+            }
+            say 'ERROR: invalid recipient \'', $msg->{to}, '\' from \'', $msg->{from}, '\'', ' msg: \'', $msg->{msg}, '\'' unless $sent;
         }
-        say 'ERROR: invalid recipient \'', $msg->{to}, '\' from \'', $msg->{from}, '\'', ' msg: \'', $msg->{msg}, '\'' unless $sent;
+        delete $flush->{$stream_name};
     }
     return @parent;
 }
