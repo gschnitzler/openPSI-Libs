@@ -37,7 +37,7 @@ sub _decode_msg ($line) {
 
 sub _get_unfiltered_msg ( $from, $line ) {
 
-    chomp($line);
+    chomp $line;
     my $msg = {};
 
     if ( $line =~ /^\0/ ) {
@@ -54,18 +54,23 @@ sub _get_unfiltered_msg ( $from, $line ) {
     return $msg;
 }
 
+sub _is_partial($s) {
+    $s =~ /\n$/ ? return 0 : return 1;
+}
+
 sub _add_to_buffer ( $buffer, $flush, $from, $stream ) {
     my $stream_name = $stream->[0];
 
     while ( my $line = shift $stream->[1]->@* ) {
 
-        my $msg = _get_unfiltered_msg $from, $line;
-        my $to  = $msg->{to};
+        my $is_partial = _is_partial($line);
+        my $msg        = _get_unfiltered_msg $from, $line;
+        my $to         = $msg->{to};
         $buffer->{$stream_name}->{$to} = () unless ref $buffer->{$stream_name}->{$to} eq 'ARRAY';
         push $buffer->{$stream_name}->{$to}->@*, $msg->{msg};
-        next unless $line =~ /\n$/;
-        $flush->{$stream_name}->{$to} = join '', $buffer->{$stream_name}->{$to}->@*;
-        delete $buffer->{$stream_name}->{$to};
+        next if $is_partial;
+        $flush->{$stream_name}->{$to} = () unless ref $flush->{$stream_name}->{$to} eq 'ARRAY';
+        push $flush->{$stream_name}->{$to}->@*, join '', delete( $buffer->{$stream_name}->{$to} )->@*;
         delete $buffer->{$stream_name} unless scalar keys $buffer->{$stream_name}->%*;
     }
     return;
@@ -105,29 +110,34 @@ sub relay_msgs ( $self, $others, @streams ) {
     }
 
     for my $stream_name ( keys $flush->%* ) {
-        for my $to ( keys $flush->{$stream_name}->%* ) {
-            my $msg = {
-                from => $from,
-                to   => $to,
-                msg  => delete $flush->{$stream_name}->{$to}
-            };
+        my $flush_stream = delete $flush->{$stream_name};
 
-            if ( $to eq 'parent' ) {
-                push @parent, $msg;
-                next;
-            }
+        for my $to ( keys $flush_stream->%* ) {
+            my $flush_stream_to = $flush_stream->{$to};
+            
+            for my $msg ( $flush_stream_to->@* ) {
+                my $msg = {
+                    from => $from,
+                    to   => $to,
+                    msg  => $msg
+                };
 
-            my $sent = 0;
-            for my $worker ( $others->@* ) {
-                last if ($sent);
-                if ( exists( $worker->{PID}->{name} ) && $worker->{PID}->{name} eq $msg->{to} ) {
-                    $worker->{PID}->write_stdin( _encode_msg($msg), "\n" );
-                    $sent++;
+                if ( $to eq 'parent' ) {
+                    push @parent, $msg;
+                    next;
                 }
+
+                my $sent = 0;
+                for my $worker ( $others->@* ) {
+                    last if ($sent);
+                    if ( exists( $worker->{PID}->{name} ) && $worker->{PID}->{name} eq $msg->{to} ) {
+                        $worker->{PID}->write_stdin( _encode_msg($msg), "\n" );
+                        $sent++;
+                    }
+                }
+                say 'ERROR: invalid recipient \'', $msg->{to}, '\' from \'', $msg->{from}, '\'', ' msg: \'', $msg->{msg}, '\'' unless $sent;
             }
-            say 'ERROR: invalid recipient \'', $msg->{to}, '\' from \'', $msg->{from}, '\'', ' msg: \'', $msg->{msg}, '\'' unless $sent;
         }
-        delete $flush->{$stream_name};
     }
     return @parent;
 }

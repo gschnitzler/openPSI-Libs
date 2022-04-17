@@ -7,21 +7,30 @@ use Data::Dumper;
 use Time::HiRes qw(sleep);
 use Carp;
 
+use PSI::RunCmds qw(run_cmd);
 use Process::Message qw(get_msg put_msg);
 use Process::Manager qw(task_manager);
 
 #########################################################
 
-my $debug   = 1;
+my $debug   = 0;
 my $workers = {
     A => {
         TASK => sub ($data) {
+            local $! = 0;
+            local $? = 0;
 
             my $task_name = 'A';
             my ( $k, $v ) = ( $data->%* );
-
             say "$task_name started";
             sleep 1;
+            print "bla1\nbla2\nbla3\nbla4\nbla5\nbla6";
+            sleep 1;
+            print "_7";
+            sleep 1;
+            say "_8";
+            sleep 1;
+            run_cmd('echo bla');
             put_msg(
                 {
                     to  => 'B',
@@ -149,6 +158,27 @@ my $workers = {
             );
             say "$task_name say msg to parent";
             say "$task_name will only finish after AC!";
+
+          GETOUT: while (1) {
+
+                local ( $!, $? );
+
+                #while ( !eof(STDIN) ) {
+                #    defined( $_ = readline STDIN ) or die "readline failed: $!";
+                #    my $msg = get_msg($_);
+                foreach my $msg ( get_msg( readline(STDIN) ) ) {
+                    
+                    put_msg(
+                        {
+                            to  => 'parent',
+                            msg => "B received: $msg->{msg}"
+                        }
+                    );
+                    last GETOUT if ( $msg->{msg} eq "THATS IT I QUIT" );
+                }
+                sleep 0.2;
+            }
+            return;
 
             while (1) {
 

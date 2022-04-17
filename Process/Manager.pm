@@ -39,6 +39,10 @@ sub _init_workers ( $debug, $max_slots, $used_slots, $workers ) {
 
     my @initialized = ();
 
+    # fork emits Inappropriate ioctl for device, ignore
+    local $? = 0;
+    local $! = 0;
+
     while ( my $e = shift $workers->@* ) {
 
         if ( $max_slots - ${$used_slots} <= 0 ) {
@@ -53,14 +57,16 @@ sub _init_workers ( $debug, $max_slots, $used_slots, $workers ) {
             BUFFER => {},
             FLUSH  => {},
             PID    => fork {
-                max_proc => 0,                     # 0 gives uninitialized value, use -1, fixed in 0.93
+                max_proc => 0,                         # 0 gives uninitialized value, use -1, fixed in 0.93
                 name     => $name,
                 sub      => $w->{TASK},
                 args     => $w->{DATA},
-                child_fh => 'in,out,err,:utf8',    # sockets impose a buffer limit. which is bad. pipes are even worse. so stick to temp files.
-                                                   # took me 2 days to track this down. jobs would hang with unread buffers when you write to much to stdout
+                child_fh => 'in,out,err,:utf8', # sockets impose a buffer limit. which is bad. pipes are even worse. so stick to temp files.
+                                                       # took me 2 days to track this down. jobs would hang with unread buffers when you write to much to stdout
             },
         };
+        $! = 0;
+        $? = 0;
 
         # time limit on child processes
         # $pid = fork { cmd => $cmd, timeout => 30 };  # kill child if not done in 30s
@@ -68,7 +74,7 @@ sub _init_workers ( $debug, $max_slots, $used_slots, $workers ) {
         # as we already have a loop for the messaging, we will use that.
         $worker->{TIMEOUT} = time + $w->{TIMEOUT} if ( exists( $w->{TIMEOUT} ) );
 
-        die 'ERROR: could not fork.'                             if ( !$worker->{PID} );
+        die 'ERROR: could not fork.' if ( !$worker->{PID} );
         print_table( $name, "(PID: $worker->{PID}))", ": OK\n" ) if ($debug);
         push @initialized, $worker;
         ${$used_slots}++;
@@ -84,14 +90,15 @@ sub _print_parent_msg ( $msg, $debug ) {
 
 sub _relay_msgs ( $debug, $self, $others, $msg_handler ) {
 
+    # read_stderr and read_sdtout feature standard diagnostics of nothing could be read. thats ok.
+    local $? = 0;
+    local $! = 0;
     my @lines = (
         [ 'err', [ $self->{PID}->read_stderr() ] ],    #
         [ 'out', [ $self->{PID}->read_stdout() ] ]     #
     );
-
-    # read_stderr and read_sdtout feature standard diagnostics of nothing could be read.
-    # thats ok. to make debugging easier:
-    $? = $! = 0;    ## no critic
+    $? = 0;
+    $! = 0;
 
     foreach my $msg ( relay_msgs( $self, $others, @lines ) ) {
         ref $msg_handler eq 'CODE' ? $msg_handler->( $msg, $debug ) : _print_parent_msg( $msg, $debug );    # these are for the parent
@@ -99,7 +106,7 @@ sub _relay_msgs ( $debug, $self, $others, $msg_handler ) {
     return;
 }
 
-sub _cleanup_worker ($worker) {    # empty buffer
+sub _cleanup_worker ($worker) {                                                                             # empty buffer
 
     if ( scalar keys $worker->{BUFFER}->%* || scalar keys $worker->{FLUSH}->%* ) {
         say "WARNING: process $worker->{PID}->{name} had an unread buffer on exit:";
@@ -108,11 +115,11 @@ sub _cleanup_worker ($worker) {    # empty buffer
     }
     say "WARNING: process $worker->{PID}->{name} exit code was: $worker->{PID}->{status}" if ( $worker->{PID}->{status} );
 
+    # dispose emits 'No such file or directory'.thats ok.
+    local $? = 0;
+    local $! = 0;                                                                                           ## no critic
     $worker->{PID}->wait();
     $worker->{PID}->dispose();
-
-    # dispose emits 'No such file or directory'.thats ok.
-    $? = $! = 0;    ## no critic
 
     delete $worker->{PID};
     return;
@@ -154,6 +161,8 @@ sub task_manager ( $debug, $workers, $max_slots, @args ) {
 
     local $SIG{TERM} = $die;
     local $SIG{INT}  = $die;
+    local $?         = 0;
+    local $!         = 0;
 
     # we receive a dependency tree of tasks
     # every root node is added to a queue
@@ -164,9 +173,10 @@ sub task_manager ( $debug, $workers, $max_slots, @args ) {
     # not the most elegant, but easy to implement.
     while (1) {
 
-        last          if ( $#running < 0 );
+        last if ( $#running < 0 );
         say '=CYCLE=' if $debug;
         sleep $SLEEP_INTERVAL;
+
         my $time = time;
 
         # process the queue. we want to iterate over all entries, adding and deleting whenever a worker finished.
@@ -201,15 +211,18 @@ sub task_manager ( $debug, $workers, $max_slots, @args ) {
         }
 
         # start new jobs if slots got available
+
         push @cur_running, _init_workers( $debug, $max_slots, \$used_slots, \@waiting );
+
         @running = (@cur_running);
     }
-    waitall();
 
     # waitall emits an error code. Forks::Super installs its own $SIG{CHLD} handler.
     # so the value is actual garbage, but others might read it
     # get rid of it
-    $? = $! = 0;    ## no critic
+    waitall();
+    $? = 0;
+    $! = 0;
 
     # https://rt.cpan.org/Public/Bug/Display.html?id=124316
     # to work around side-effects at the distance, call this
