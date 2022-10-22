@@ -405,7 +405,7 @@ sub create_accounts ( $domains, $lets_encrypt_accounts ) {
     _do_per_zone(    # generate domain keys
         $tree,
         sub ( $ct, $at, $z ) {
-            return {} unless ( kexists( $ct, $z, 'KEY' ) );
+            return {} unless ( defined kexists( $ct, $z, 'KEY' ) );
             print_table 'Generating Domain key', $z, ': ';
             $ct->{$z}->{KEY} = Crypt::Perl::ECDSA::Generate::by_name('secp384r1')->to_pem_with_curve_name();
             say 'OK';
@@ -416,7 +416,7 @@ sub create_accounts ( $domains, $lets_encrypt_accounts ) {
     _do_per_zone(    # create letsencrypt accounts
         $tree,
         sub ( $ct, $at, $z ) {
-            return {} unless ( kexists( $ct, $z, 'ID' ) );
+            return {} unless ( defined kexists( $ct, $z, 'ID' ) );
             print_table 'Create Account', $z, ': ';
             my $acme = Net::ACME2::LetsEncrypt->new(
                 environment => $le_environment,
