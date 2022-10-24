@@ -113,6 +113,7 @@ sub _build_a_tree($records) {
 
         my $name    = $e->{name};
         my $content = $e->{content};
+
         #say Dumper $e;
 
         # only way I found to decode the blessed JSON::PP::Boolean value.
@@ -132,7 +133,7 @@ sub _build_a_tree($records) {
         $ref->{content}   = $e->{content};
 
         #if ( $e->{type} eq 'MX' ) {    # MX records have a priority;
-        $ref->{priority} = $e->{priority} if exists $e->{priority};
+        $ref->{priority} = int( $e->{priority} ) if exists $e->{priority};
 
         #}
 
@@ -255,8 +256,16 @@ sub add_dns_cloudflare ( $keys, $tree ) {
             name    => $name,
             content => $content
         };
-        $args->{priority} = $dns_record->{priority} if $type eq 'MX';
-
+        $args->{priority} = int( $dns_record->{priority} ) if $type eq 'MX';
+        if ( $type eq 'CAA' ) {
+            my ( $flags, $tag, $value ) = split( /\s+/, $content );
+            $value =~ s/\"//g;
+            $args->{data} = {
+                flags => int($flags),
+                tag   => $tag,
+                value => $value
+            };
+        }
         add_tree $t->{$entry_name}, dclone _add_zone_record( $api->{$zone_name}, $zone_id, $args );
 
         say 'OK';
