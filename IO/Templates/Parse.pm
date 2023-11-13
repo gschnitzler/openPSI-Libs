@@ -7,8 +7,8 @@ use Template;
 use Template::Context;
 
 use Tree::Search qw(tree_fraction);
-use Tree::Slice qw(slice_tree);
-use Tree::Build qw(build_tree_data);
+use Tree::Slice  qw(slice_tree);
+use Tree::Build  qw(build_tree_data);
 use PSI::Console qw(print_table);
 
 our @EXPORT_OK =
@@ -16,15 +16,54 @@ our @EXPORT_OK =
 
 ###################################################
 
-sub _file_cond($b) {
+sub _file_cond ($b) {
     return 1 if ( ref $b->[0] eq 'HASH' && exists( $b->[0]->{CONTENT} ) && exists( $b->[0]->{CHMOD} ) );
     return 0;
 }
 
-sub _dir_cond($b) {
+sub _dir_cond ($b) {
     return 0 if ( $b->[1]->[-1] ne '..' );
     pop $b->[1]->@*;    # remove '..'
     return 1;
+}
+
+sub _combine_blocks (@template) {
+
+    my @combined = ();
+    my @block    = ();
+    my $counter  = {
+        start   => 0,
+        end     => 0,
+        current => ''
+    };
+
+    for my $line (@template) {
+
+        if ( $line =~ /^\s*\#\$block\s*(start|end)/x ) {
+
+            my $startend = $1;
+            $counter->{current} = $startend;
+            $counter->{$startend}++;
+
+            next unless ( $startend eq 'end' );
+            push @combined, join( "\n", @block );
+            $counter->{current} = '';
+            @block = ();
+            next;
+        }
+
+        if ( $counter->{current} eq 'start' ) {
+            push @block, $line;
+            next;
+        }
+
+        if ( !$counter->{current} ) {
+            push @combined, $line;
+            next;
+        }
+    }
+    die 'ERROR: uneven start/end block count' unless ( $counter->{start} == $counter->{end} );
+    return @combined;
 }
 
 sub _fill_template ( $template, $substitutions ) {
@@ -37,7 +76,7 @@ sub _fill_template ( $template, $substitutions ) {
         \$template_string,
         $substitutions,
         sub ($output) {
-            @filled_template = split( /\n/x, $output );    # convert back to array
+            @filled_template = _combine_blocks split( /\n/x, $output );    # convert back to array
         }
       )
       or do {
@@ -96,11 +135,11 @@ sub _get_ref ( $pointer, @keys ) {
 ###
 ##############################################
 my $allowed_tt_vmethods = {
-    match   => sub($b) { pop $b->[1]->@*; },
-    ttvalue => sub($b) { pop $b->[1]->@*; }    # this is a TT variable name than can be used inside templates to store values for scripting tt
+    match   => sub ($b) { pop $b->[1]->@*; },
+    ttvalue => sub ($b) { pop $b->[1]->@*; }    # this is a TT variable name than can be used inside templates to store values for scripting tt
 };
 
-sub get_variable_tree($array) {
+sub get_variable_tree ($array) {
 
     my $template_string   = join( "\n", $array->@* );                                 # convert array to string, TT wants it so
     my $obj               = Template::Context->new( TRACE_VARS => 1 );                # get a tree of all variables used
@@ -109,7 +148,7 @@ sub get_variable_tree($array) {
 
     return slice_tree(
         $substitution_tree,
-        sub($branch) {
+        sub ($branch) {
 
             # check for bad quotations
             if ( exists( $branch->[0]->{item} ) ) {
@@ -169,7 +208,7 @@ sub check_and_fill_template_tree ( $tree, $substitutions ) {
         },
         slice_tree(
             $tree,
-            sub($b) {
+            sub ($b) {
                 return 1 if ( ref $b->[0] eq 'HASH' && exists( $b->[0]->{CONTENT} ) && ref( $b->[0]->{CONTENT} ) eq 'ARRAY' );
                 return 0;
             }
@@ -180,11 +219,11 @@ sub check_and_fill_template_tree ( $tree, $substitutions ) {
         print_table( 'Missing/Too short variable', '', ": $_\n" ) for ( sort keys $missing->%* );
     }
     die 'ERROR: variable check not passed' if ( scalar @missed != 0 );
-    return @filled_templates if (wantarray);
+    return @filled_templates               if (wantarray);
     return $filled_template_tree;
 }
 
-sub get_template_dirs($t) {
+sub get_template_dirs ($t) {
 
     my @dirs = ();
 
@@ -196,7 +235,7 @@ sub get_template_dirs($t) {
     return @dirs;
 }
 
-sub get_template_files($t) {
+sub get_template_files ($t) {
 
     my @files = ();
 
@@ -218,7 +257,7 @@ sub get_template_files($t) {
 
 # see this as equivalent of get_directory_tree from PSI::Parse::Dir
 # it takes a template tree, and builds a tree like get_directory_tree does
-sub get_directory_tree_from_templates($tree) {
+sub get_directory_tree_from_templates ($tree) {
 
     my $directory_tree = {};
 
@@ -229,7 +268,7 @@ sub get_directory_tree_from_templates($tree) {
     }
     foreach my $entry ( slice_tree( $tree, \&_dir_cond ) ) {
         my ( $pointer, $last_dir ) = _get_ref( $directory_tree, $entry->[1]->@* );
-        next unless $last_dir;    # ignore empty location. happens when the '..' of parent dir is resolved
+        next unless $last_dir;                                               # ignore empty location. happens when the '..' of parent dir is resolved
         $pointer->{$last_dir} = 'd' if ( !exists $pointer->{$last_dir} );    # empty dirs have a dir type
     }
 
