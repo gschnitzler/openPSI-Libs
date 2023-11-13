@@ -5,11 +5,11 @@ use Exporter qw(import);
 use Data::Dumper;
 use Term::ANSIColor qw(colorstrip color);
 
-use Tree::Iterators qw(array_iterator);
-use Tree::Slice qw(slice_tree);
-use PSI::Parse::File qw(read_files);
-use PSI::Console qw(print_table count_down);
-use PSI::RunCmds qw(run_open);
+use Tree::Iterators   qw(array_iterator);
+use Tree::Slice       qw(slice_tree);
+use PSI::Parse::File  qw(read_files);
+use PSI::Console      qw(print_table count_down);
+use PSI::RunCmds      qw(run_open);
 use IO::Config::Check qw(file_exists);
 
 our @EXPORT_OK = qw(assemble_packages read_system_packages read_pkgversion compare_pkgversion);
@@ -18,8 +18,9 @@ our @EXPORT_OK = qw(assemble_packages read_system_packages read_pkgversion compa
 
 sub _read_package ($pkg_content) {
 
-    my $option_regex = qr/([^=]+)=([^\s]+)/x;
-    my $sections     = {
+    my $option_regex    = qr/([^=]+)=([^\s]+)/x;
+    my $section_pointer = '';
+    my $sections        = {
         flags       => [],
         post        => [],
         pre         => [],
@@ -27,8 +28,6 @@ sub _read_package ($pkg_content) {
         description => [],    # this is a comment section and will be ignored
         options     => {},
     };
-
-    my $section_pointer = '';
 
     # split sections
     foreach my $line ( $pkg_content->@* ) {
@@ -38,10 +37,9 @@ sub _read_package ($pkg_content) {
             my $section         = $1;
             my $section_options = $2;
 
-            #            say "section: $section, options: $section_options";
             die "ERROR: unknown section $section" unless ( exists( $sections->{$section} ) );
 
-            $section_pointer = $sections->{$section}; # update section pointer
+            $section_pointer = $sections->{$section};    # update section pointer
 
             # add section options
             foreach my $option ( split( /\s+/, $section_options ) ) {
@@ -214,7 +212,7 @@ sub _print_changed ($changed) {
         }
 
         my $version_string = join( ' => ', join( '', @old_version ), join( '', @highlighted_new_version ) );
-        my $use_string     = join( ' ', 'Removed:', color('red'), @removed_use, color('reset'), 'Added:', color('red'), @added_use, color('reset') );
+        my $use_string     = join( ' ',    'Removed:', color('red'), @removed_use, color('reset'), 'Added:', color('red'), @added_use, color('reset') );
         print_table( $name, $version_string, ": $use_string\n" );
 
         #say 'Changed';
@@ -385,8 +383,6 @@ sub assemble_packages ( $debug, $module_t ) {
 
         say 'OK' if $debug;
     }
-
-    # say Dumper $module_t;
     return $module_t;
 }
 1;
