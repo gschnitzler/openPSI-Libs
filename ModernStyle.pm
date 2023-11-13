@@ -1,9 +1,8 @@
 # This is basically Modern::Perl with added subroutine signatures
 package ModernStyle;
 
-use 5.028;
+use v5.36;
 use strict;
-use warnings;
 use mro     ();
 use feature ();
 
@@ -21,8 +20,8 @@ sub import {
     my ($class) = @_;
     warnings->import;
     strict->import;
-    feature->import( ':5.28', 'signatures' );
-    warnings->unimport('experimental::signatures');
+    feature->import( ':5.36' );
+    #warnings->unimport('experimental::signatures');
     mro::set_mro( scalar caller(), 'c3' );
     return;
 }
