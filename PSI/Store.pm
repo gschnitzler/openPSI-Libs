@@ -4,7 +4,7 @@ use ModernStyle;
 use Data::Dumper;
 use Exporter qw(import);
 
-use PSI::RunCmds qw(run_cmd);
+use PSI::RunCmds      qw(run_cmd);
 use IO::Config::Check qw(dir_exists file_exists);
 
 our @EXPORT_OK = qw(store_image load_image);
@@ -21,11 +21,10 @@ sub store_image ($p) {
     die "ERROR: no such directory '$source'" unless ( dir_exists $source );
     die "ERROR: no such directory '$target'" unless ( dir_exists $target );
 
-    my $target_string = join( '', $target, '/', $filename, '___', $tag, '.tar.xz' );
+    my $target_string = join( '', $target, '/', $filename, '___', $tag, '.tar.zst' );
     run_cmd("mkdir -p $target");
     run_cmd("rm -f $target_string");
-    run_cmd("cd $source && XZ_OPT=-1 tar --xattrs -C . $options -cpJf $target_string . && chmod 640 $target_string")
-      ;    # XZ_OPT is the only way to pass flags to xz via tar.
+    run_cmd("cd $source && ZSTD_NBTHREADS=0 ZSTD_CLEVEL=6 tar --xattrs -C . $options --zstd -cpf $target_string . && chmod 640 $target_string");
     return;
 }
 
