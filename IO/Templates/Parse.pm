@@ -45,6 +45,7 @@ sub _combine_blocks (@template) {
             $counter->{current} = $startend;
             $counter->{$startend}++;
 
+            push @block, $line; # include the #$block tags, to withstand multiple _fill_templates passes
             next unless ( $startend eq 'end' );
             push @combined, join( "\n", @block );
             $counter->{current} = '';

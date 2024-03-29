@@ -5,12 +5,12 @@ use Exporter qw(import);
 use Data::Dumper;
 
 use Core::Plugins::Condition qw(plugin_condition);
-use Core::Plugins::Data qw(plugin_data);
+use Core::Plugins::Data      qw(plugin_data);
 
 use IO::Templates::Parse qw(check_and_fill_template get_variable_tree);
-use Tree::Slice qw(slice_tree);
-use Tree::Merge qw(add_tree);
-use Tree::Build qw(build_tree_data);
+use Tree::Slice          qw(slice_tree);
+use Tree::Merge          qw(add_tree);
+use Tree::Build          qw(build_tree_data);
 
 use PSI::RunCmds qw(run_cmd);
 use PSI::Console qw(print_table);
@@ -28,7 +28,6 @@ sub _read_script ($script) {
     my @multiline = ();
 
     foreach my $line ( $script->@* ) {
-
         unless (@multiline) {
             next if ( $line =~ /^\#/x );    # skip comments unless inside multiline # x requires \#
             next if ( $line eq '' );        # skip empty lines unless in multiline
@@ -49,7 +48,7 @@ sub _read_script ($script) {
         }
 
         push @multiline, join( '', $line, "\n" ) if (@multiline);
-        push @action, $line unless (@multiline);    # normal newlines are inserted at execution
+        push @action,    $line unless (@multiline);                 # normal newlines are inserted at execution
     }
     return (@action);
 }
@@ -81,7 +80,7 @@ sub _generate_scripts ( $debug, $p ) {
 
         print_table( 'Loading Script', join( ' ', $path->@* ), ': ' ) if ($debug);
 
-        delete $script_def->{CHMOD}; # unneeded
+        delete $script_def->{CHMOD};    # unneeded
 
         my $content = delete $script_def->{CONTENT};
 
