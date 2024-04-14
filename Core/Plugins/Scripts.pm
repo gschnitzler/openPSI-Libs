@@ -22,46 +22,13 @@ my $script_ref = {
     CHMOD   => ''         # is a SCALAR, but not a SCALAR reference.
 };
 
-sub _read_script ($script) {
-
-    my @action    = ();
-    my @multiline = ();
-
-    foreach my $line ( $script->@* ) {
-        unless (@multiline) {
-            next if ( $line =~ /^\#/x );    # skip comments unless inside multiline # x requires \#
-            next if ( $line eq '' );        # skip empty lines unless in multiline
-        }
-
-        if ( $line =~ /(cat|patch).*EOF/x ) {
-
-            push @multiline, join( '', $line, "\n" );
-            next;
-        }
-
-        if ( $line eq 'EOF' ) {
-
-            push @multiline, join( '', $line, "\n" );
-            push @action, join( '', @multiline );
-            @multiline = ();
-            next;
-        }
-
-        push @multiline, join( '', $line, "\n" ) if (@multiline);
-        push @action,    $line unless (@multiline);                 # normal newlines are inserted at execution
-    }
-    return (@action);
-}
-
 sub _script_cmd ($cmds) {
 
     return sub ( $query, @args ) {
 
-        my $data    = $query->();
-        my $script  = check_and_fill_template( $cmds, $data );
-        my @actions = _read_script($script);
-
-        run_cmd(@actions);
+        my $data   = $query->();
+        my $script = check_and_fill_template( $cmds, $data );
+        run_cmd($script->@*);
         return;
     };
 }

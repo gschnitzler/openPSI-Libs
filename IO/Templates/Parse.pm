@@ -6,6 +6,7 @@ use Data::Dumper;
 use Template;
 use Template::Context;
 
+use InVivo       qw(kexists);
 use Tree::Search qw(tree_fraction);
 use Tree::Slice  qw(slice_tree);
 use Tree::Build  qw(build_tree_data);
@@ -27,44 +28,92 @@ sub _dir_cond ($b) {
     return 1;
 }
 
-sub _combine_blocks (@template) {
+# readd #$block tags (for #$block and #$file), to withstand multiple _fill_templates passes.
+# but #$file can only be resolved once. might hit edge cases when multiple fill passes will increase lines
+# (ie when TT state variables are expanded at runtime)
+sub _split_file_contents ($state) {
 
-    my @combined = ();
-    my @block    = ();
-    my $counter  = {
-        start   => 0,
-        end     => 0,
-        current => ''
+    unless ( defined $state->{file} ) {
+        return ( join( "\n", '#$block start', $state->{buffer}->@*, '#$block end' ) );
+    }
+
+    my $file   = $state->{file};
+    my @buffer = $state->{buffer}->@*;
+    my @slices = ();
+
+    push @slices, [ splice @buffer, 0, $state->{file_lines} ] while @buffer;
+
+    my $first_slice = shift @slices;
+    push @buffer, join( "\n", '#$block start', "cat > $file << \"EOF\"",  $first_slice->@*, 'EOF', '#$block end' );
+    push @buffer, join( "\n", '#$block start', "cat >> $file << \"EOF\"", $_->@*,           'EOF', '#$block end' ) for @slices;
+
+    return (@buffer);
+}
+
+# The idea was to execute every line of script on its own to catch errors, much like Dockerfiles.
+# It turned out quickly that this was problematic for patch and cat with HEREDOCs.
+# So a multiline workaround was added to Core Shell. Everything else was stuffed into a single line,
+# when the need arose. So the #$block tag was introduced. Interacting with the system via shell means starting a process and passing it data.
+# This is also true for interacting with files (create, modify etc). The Shell however has limits on its buffers for passing data in all its forms.
+# Be it arguments, HEREDOCS, variables. Whatever. So injecting anything but the smallest amount of data quickly results in 'Argument list too long'
+# and such errors. There are workarounds, like stripping, zipping and base64 encoding data, increasing buffer sizes and somesuch...
+# Workarounds like that eventually lead to allnighters involving drinking, pulling hair and considering past life choices.
+# So, lets be clever and circumvent all this by *drumroll* another buffer and another tag (#$file)! Of course.
+# Because this will certainly lead to a lot of fun down the road. OK. So, lets do the most stupid thing,
+# and wrap every other line in its own HEREDOC and spawn a shell... Doesn't that sounds amazing
+sub _combine_block_contents (@content) {
+
+    my @new_content = ();
+    my $state       = {
+        start      => 0,
+        file       => undef,
+        file_lines => 50,
+        buffer     => [],
     };
 
-    for my $line (@template) {
+    my $add = {
+        start => sub ( $type, $file ) {
 
-        if ( $line =~ /^\s*\#\$block\s*(start|end)/x ) {
+            die 'ERROR: start before end' if $state->{start};
+            $state->{start} = 1;
 
-            my $startend = $1;
-            $counter->{current} = $startend;
-            $counter->{$startend}++;
+            if ( $type eq 'file' ) {
+                die 'ERROR: no file' unless $file;
+                $state->{file} = $file;
+            }
+            return;
+        },
+        end => sub(@) {
 
-            push @block, $line; # include the #$block tags, to withstand multiple _fill_templates passes
-            next unless ( $startend eq 'end' );
-            push @combined, join( "\n", @block );
-            $counter->{current} = '';
-            @block = ();
+            die 'ERROR: end before start' unless $state->{start};
+            my @buffer = _split_file_contents($state);
+            $state->{start}  = 0;
+            $state->{file}   = undef;
+            $state->{buffer} = [];
+            return (@buffer);
+        },
+        line => sub ($line) {
+
+            return $line unless $state->{start};
+            push $state->{buffer}->@*, $line;
+            return;
+        }
+    };
+
+    foreach my $line (@content) {
+
+        if ( $line =~ /^\s*\#\$(block|file)\s(start|end)\s*(.*)/x ) {
+            
+            my ( $type, $anchor, $file_name ) = ( $1, $2, $3 );
+            die "ERROR: Invalid state $type $anchor" unless exists( $add->{$anchor} );
+            push @new_content, $add->{$anchor}->( $type, $file_name );
             next;
         }
-
-        if ( $counter->{current} eq 'start' ) {
-            push @block, $line;
-            next;
-        }
-
-        if ( !$counter->{current} ) {
-            push @combined, $line;
-            next;
-        }
+        push @new_content, $add->{line}->($line);
     }
-    die 'ERROR: uneven start/end block count' unless ( $counter->{start} == $counter->{end} );
-    return @combined;
+
+    die 'ERROR: unread buffer or no end' if ( scalar $state->{buffer}->@* or $state->{start} );
+    return (@new_content);
 }
 
 sub _fill_template ( $template, $substitutions ) {
@@ -77,7 +126,7 @@ sub _fill_template ( $template, $substitutions ) {
         \$template_string,
         $substitutions,
         sub ($output) {
-            @filled_template = _combine_blocks split( /\n/x, $output );    # convert back to array
+            @filled_template = _combine_block_contents split( /\n/x, $output );    # convert back to array
         }
       )
       or do {
