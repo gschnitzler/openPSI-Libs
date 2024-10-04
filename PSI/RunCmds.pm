@@ -21,7 +21,7 @@ sub _rescueshell ( $p ) {
     # non-root users cant write to /, but /tmp might not yet exist when buildmanager throws an error
     # This filepath should not be hardcoded
     system('touch /rescueshell') or print '';
-    system('/bin/bash')          or print '';
+    system('/usr/bin/bash')          or print '';
     if ($?) {
         say "ERROR: $? on $p->{cmd}";
         return $?;
