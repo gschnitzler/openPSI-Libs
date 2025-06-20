@@ -106,7 +106,7 @@ sub _get_zone_records ( $api, $zoneid, $type ) {
     return $zone_records;
 }
 
-sub _build_a_tree($records) {
+sub _build_a_tree($zone_name, $zone_id, $records) {
 
     my $tree = {};
     foreach my $e ( $records->@* ) {
@@ -127,8 +127,11 @@ sub _build_a_tree($records) {
         $ref->{type}      = $e->{type};
         $ref->{proxied}   = $proxied;
         $ref->{id}        = $e->{id};
-        $ref->{zone_id}   = $e->{zone_id};
-        $ref->{zone_name} = $e->{zone_name};
+        #$ref->{zone_id}   = $e->{zone_id}; # deprecated https://developers.cloudflare.com/fundamentals/api/reference/deprecations/#2024-11-30
+        #$ref->{zone_name} = $e->{zone_name}; # deprecated https://developers.cloudflare.com/fundamentals/api/reference/deprecations/#2024-11-30
+        $ref->{zone_id}   = $zone_id;
+        $ref->{zone_name} = $zone_name;
+        
         $ref->{name}      = $e->{name};
         $ref->{content}   = $e->{content};
 
@@ -178,7 +181,7 @@ sub list_dns_cloudflare ( $keys, @ ) {
     foreach my $zone_name ( keys $api->%* ) {
 
         for my $type (@supported_types) {
-            $dns->{$zone_name}->{$type} = _build_a_tree( _get_zone_records( $api->{$zone_name}, $dns->{$zone_name}->{ZONEID}, $type ) );
+            $dns->{$zone_name}->{$type} = _build_a_tree( $zone_name, $dns->{$zone_name}->{ZONEID}, _get_zone_records( $api->{$zone_name}, $dns->{$zone_name}->{ZONEID}, $type ) );
         }
     }
 
