@@ -282,7 +282,7 @@ sub _lookup_txt ( $domain, $wanted_value ) {
 
     while (1) {
 
-        foreach my $value ( run_open "host -t txt $domain || true" ) {
+        foreach my $value ( run_open "host -t txt $domain 1.1.1.1 || true" ) { # ask cloudflare directly
 
             if ( $value =~ /[^"]+"([^"]+)"/ ) {
                 my $v = $1;
